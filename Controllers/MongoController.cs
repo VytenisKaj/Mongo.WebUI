@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Mongo.Infrastructure.Models;
+using Mongo.WebUI.Models;
 using Mongo.WebUI.Services;
 
 namespace Mongo.WebUI.Controllers
@@ -16,30 +17,36 @@ namespace Mongo.WebUI.Controllers
             _mongoService = mongoService;
         }
 
-
-        [HttpGet]
-        public async Task<List<Car>> Get() => await _mongoService.GetAsync();
+        [HttpGet("/allItems")]
+        public async Task<List<Airplane>> Get() => await _mongoService.GetAsync();
 
         [HttpGet("{id:length(24)}")]
-        public async Task<ActionResult<Car>> Get(string id)
+        public async Task<ActionResult<Airplane>> Get(string id)
         {
-            var car = await _mongoService.GetAsync(id);
+            var airplane = await _mongoService.GetAsync(id);
 
-            if (car is null)
+            if (airplane is null)
             {
                 return NotFound();
             }
 
-            return car;
+            return airplane;
         }
 
 
-        [HttpPost]
-        public async Task<IActionResult> Post(Car newCar)
+        [HttpPost("addAirplane/{name}/{capacity}/{destination}/{flightTime}")]
+        public async Task<IActionResult> Post(string name, int capacity, string destination, string flightTime)
         {
-            await _mongoService.CreateAsync(newCar);
+            Airplane airplane = new()
+            {
+                Name = name,
+                Destination = destination,
+                FlightTime = DateTime.Parse(flightTime),
+                Capacity = capacity
+            };
+            await _mongoService.CreateAsync(airplane);
 
-            return CreatedAtAction(nameof(Get), new { id = newCar.Id }, newCar);
+            return CreatedAtAction(nameof(Get), new { id = airplane.Id }, airplane);
         }
     }
 }

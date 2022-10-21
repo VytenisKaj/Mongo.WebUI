@@ -4,7 +4,7 @@ using Mongo.WebUI.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.Configure<CarRentalDatabaseSettings>(builder.Configuration.GetSection("CarRentalDatabase"));
+builder.Services.Configure<FlightBookingDatabaseSettings>(builder.Configuration.GetSection("BookingDatabase"));
 builder.Services.AddSingleton<MongoService>();
 
 
