@@ -10,7 +10,6 @@ namespace Mongo.WebUI.Models
         public string Destination { get; set; }
         public string PassengerId { get; set; }
 
-        // Id is not generated for embedded objects, doing it manually
         public Ticket() { Id = ObjectId.GenerateNewId().ToString(); }
     }
 }

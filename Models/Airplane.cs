@@ -21,7 +21,5 @@ namespace Mongo.WebUI.Models
         {
             Tickets = new List<Ticket>();
         }
-
-
     }
 }

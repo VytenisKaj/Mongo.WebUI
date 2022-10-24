@@ -73,7 +73,7 @@ namespace Mongo.WebUI.Controllers
         [HttpPost("addAirplane")]
         public IActionResult AddAirplane([FromBody] Flight flight)
         {
-            var parsedDate = _mongoService.ParsedDate((DateTime)flight.FlightTime);
+            var parsedDate = _mongoService.ParsedDate(flight.FlightTime);
 
             if (parsedDate == null)
             {
@@ -88,6 +88,38 @@ namespace Mongo.WebUI.Controllers
             }
 
             return Content($"Airplane to destination {flight.Destination} was added successfully!");
+        }
+
+        [ProducesResponseType(typeof(List<string>), 200)]
+        [ProducesResponseType(typeof(BadRequestObjectResult), 400)]
+        [HttpGet("groupTickets")]
+        public async Task<List<string>> GroupTickets()
+        {
+            var groupedTickets = await _mongoService.GroupTickets();
+
+            var result = new List<string>();
+            foreach(var item in groupedTickets)
+            {
+                result.Add($"Price: {item.Key} Bought tickets: {item.Value}");
+            }
+
+            return result.Any() ? result : new List<string>() { $"No tickets were bought yet." };
+        }
+
+        [ProducesResponseType(typeof(List<string>), 200)]
+        [ProducesResponseType(typeof(BadRequestObjectResult), 400)]
+        [HttpGet("groupTicketsMapReduce")]
+        public async Task<List<string>> GroupTicketsMapReduce()
+        {
+            var groupedTickets = await _mongoService.GroupTicketsMapReduce();
+
+            var result = new List<string>();
+            foreach (var item in groupedTickets)
+            {
+                result.Add($"Price: {item.Key} Bought tickets: {item.Value}");
+            }
+
+            return result.Any() ? result : new List<string>() { $"No tickets were bought yet." };
         }
     }
 }

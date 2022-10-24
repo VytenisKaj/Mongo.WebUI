@@ -10,22 +10,23 @@ namespace Mongo.WebUI.Services
     {
         private readonly IMongoCollection<Airplane> _airplanesCollection;
         private readonly IMongoCollection<Passenger> _passengersCollection;
+        private readonly IMongoDatabase _database;
 
         public MongoService(IOptions<FlightBookingDatabaseSettings> flightBookingDatabaseSettings)
         {
             var mongoClient = new MongoClient(flightBookingDatabaseSettings.Value.ConnectionString);
 
-            var mongoDatabase = mongoClient.GetDatabase(
+            _database = mongoClient.GetDatabase(
                 flightBookingDatabaseSettings.Value.DatabaseName);
 
-            _airplanesCollection = mongoDatabase.GetCollection<Airplane>(
+            _airplanesCollection = _database.GetCollection<Airplane>(
                 flightBookingDatabaseSettings.Value.AirplanesCollectionName);
-            _passengersCollection = mongoDatabase.GetCollection<Passenger>(
+            _passengersCollection = _database.GetCollection<Passenger>(
                 flightBookingDatabaseSettings.Value.PassengersCollectionName);
         }
 
         public async Task<List<Airplane>> GetAllAirplanesAsync() =>
-            await _airplanesCollection.Find(airplane => airplane.Tickets.Any()).ToListAsync();
+            await _airplanesCollection.Find(airplane => true).ToListAsync();
 
         public async Task<List<Ticket>> GetAllTicketsFromAllAirplanesAsync()
         {
@@ -95,7 +96,6 @@ namespace Mongo.WebUI.Services
 
             return result.MatchedCount == 1 && result.ModifiedCount == 1;
         }
-
         private async Task<bool> ReduceCapacityAsync(Airplane airplane)
         {
             var filter = Builders<Airplane>.Filter.Eq(nameof(Airplane.Id), airplane.Id);
@@ -108,7 +108,7 @@ namespace Mongo.WebUI.Services
 
         public bool CreateAirplane(string airplaneName, int capacity, DateTime flightTime, string destination)
         {
-            var airplane = new Airplane()
+            var newAirplane = new Airplane()
             {
                 Name = airplaneName,
                 Capacity = capacity,
@@ -116,18 +116,71 @@ namespace Mongo.WebUI.Services
                 Destination = destination
             };
 
-            _airplanesCollection.InsertOne(airplane);
-            return _airplanesCollection.Find(airplane => airplane.Id == airplane.Id).Any();
+            _airplanesCollection.InsertOne(newAirplane);
+            return _airplanesCollection.Find(airplane => airplane.Id == newAirplane.Id).Any();
         }
 
-        public DateTime? ParsedDate(DateTime time)
+        public DateTime? ParsedDate(string time)
         {
-            if (time > DateTime.Now)
+            return DateTime.ParseExact(time, "MM/dd/yyyy HH:mm:ss", null);
+        }
+
+        public async Task<Dictionary<int, int>> GroupTickets()
+        {
+            PipelineDefinition<Airplane, BsonDocument> pipeline = new BsonDocument[]
             {
-                return DateTime.Parse($"{time.Month}/{time.Day}/{time.Year} {time.Hour}:{time.Minute}:{time.Second}");
+                new BsonDocument("$unwind",
+                    new BsonDocument("path", "$Tickets")),
+                        new BsonDocument("$group",
+                            new BsonDocument
+                            {
+                                { "_id", "$Tickets.Price" },
+                                { "Count", new BsonDocument("$sum", 1) }
+                            })
+            };
+
+            var results = await _airplanesCollection.Aggregate(pipeline).ToListAsync();
+
+            var pricesCounts = new Dictionary<int, int>();
+            foreach(var result in results)
+            {
+                pricesCounts.Add(result.AsBsonDocument[0].ToInt32(), result.AsBsonDocument[1].ToInt32());
             }
 
-            return null;
+            return pricesCounts;
+        }
+
+        public async Task<Dictionary<int, int>> GroupTicketsMapReduce()
+        {
+            string map = @"
+                function() {
+                    var ticket = this;
+                    emit(ticket.Price, { count: 1 });
+                }";
+
+            string reduce = @"        
+                function(key, values) {
+                    var result = {count: 0};
+
+                    values.forEach(function(value){               
+                        result.count += value.count;
+                    });
+
+                    return result;
+                }";
+
+            var options = new MapReduceOptions<Airplane, KeyValuePair<int, int>>();
+            options.OutputOptions = MapReduceOutputOptions.Inline;
+
+            var results = _airplanesCollection.MapReduceAsync(map, reduce, options).Result.ToList();
+
+            var pricesCounts = new Dictionary<int, int>();
+            foreach (var result in results)
+            {
+                pricesCounts.Add(result.Key, result.Value);
+            }
+
+            return pricesCounts;
         }
     }
 }

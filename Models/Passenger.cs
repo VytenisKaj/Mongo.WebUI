@@ -1,4 +1,6 @@
-﻿namespace Mongo.WebUI.Models
+﻿using MongoDB.Bson;
+
+namespace Mongo.WebUI.Models
 {
     public class Passenger
     {
@@ -6,9 +8,6 @@
         public string Name { get; set; }
         public string Surname { get; set;}
 
-        public Passenger()
-        {
-
-        }
+        public Passenger() { Id = ObjectId.GenerateNewId().ToString(); }
     }
 }
